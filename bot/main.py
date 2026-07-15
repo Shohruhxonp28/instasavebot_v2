@@ -44,7 +44,29 @@ async def main():
 
     try:
         await bot.delete_webhook(drop_pending_updates=True)
-        await dp.start_polling(bot)
+        
+        # Start bot polling as a background task
+        polling_task = asyncio.create_task(dp.start_polling(bot))
+        
+        # Start dummy web server for Render Free Web Service
+        from aiohttp import web
+        import os
+        
+        async def health_check(request):
+            return web.Response(text="Bot is running!")
+            
+        app = web.Application()
+        app.router.add_get('/', health_check)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        port = int(os.environ.get("PORT", 10000))
+        site = web.TCPSite(runner, '0.0.0.0', port)
+        await site.start()
+        
+        logging.info(f"Dummy web server started on port {port}")
+        
+        # Wait for the bot polling task
+        await polling_task
     finally:
         await close_db()
         await bot.session.close()
