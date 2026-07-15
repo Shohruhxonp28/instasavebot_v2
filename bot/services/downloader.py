@@ -37,15 +37,18 @@ def download_video(url: str) -> str:
 
     ydl_opts = {
         "outtmpl": output_template,
-        # Try progressive (single-file, no merge needed) mp4 first, then fall
-        # back to best video+audio (requires ffmpeg to merge), then anything.
-        "format": "best[ext=mp4]/bv*+ba/best",
+        "format": "bestvideo+bestaudio/best",
         "merge_output_format": "mp4",
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
         "max_filesize": MAX_VIDEO_SIZE_MB * 1024 * 1024,
     }
+
+    # Add cookies if cookies.txt exists
+    cookies_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "cookies.txt")
+    if os.path.exists(cookies_path):
+        ydl_opts["cookiefile"] = cookies_path
 
     if FFMPEG_PATH:
         ydl_opts["ffmpeg_location"] = FFMPEG_PATH
