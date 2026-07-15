@@ -1,0 +1,19 @@
+# Environments
+.env
+venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+
+# Database
+*.db
+*.sqlite3
+
+# Downloads & Media
+downloads/
+
+# Installers
+*.exe
+python_installer.exe
