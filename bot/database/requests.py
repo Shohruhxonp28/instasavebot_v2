@@ -180,6 +180,7 @@ async def get_stats() -> dict:
     tiktok = await platform_count("TikTok")
     instagram = await platform_count("Instagram")
     youtube = await platform_count("YouTube")
+    pinterest = await platform_count("Pinterest")
 
     cursor = await db.execute("SELECT COUNT(*) AS cnt FROM recognitions WHERE success = 1")
     recognized = (await cursor.fetchone())["cnt"]
@@ -194,6 +195,7 @@ async def get_stats() -> dict:
         "tiktok": tiktok,
         "instagram": instagram,
         "youtube": youtube,
+        "pinterest": pinterest,
         "recognized": recognized,
         "failed_recognitions": failed_recognitions,
     }

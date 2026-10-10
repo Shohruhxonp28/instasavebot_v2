@@ -38,4 +38,11 @@ MAX_VIDEO_SIZE_MB: int = int(os.getenv("MAX_VIDEO_SIZE_MB", "50"))
 # Example: C:\ffmpeg\bin\ffmpeg.exe
 FFMPEG_PATH: str = os.getenv("FFMPEG_PATH", "")
 
-SUPPORTED_PLATFORMS = ["TikTok", "Instagram Reels", "YouTube", "Facebook", "Twitter (X)"]
+SUPPORTED_PLATFORMS = [
+    "Instagram (Reels, Posts, Carousel)",
+    "Pinterest",
+    "TikTok",
+    "YouTube",
+    "Facebook",
+    "Twitter (X)",
+]

@@ -1,8 +1,8 @@
-# Telegram Video Downloader Bot
+# Telegram Media Downloader Bot
 
-A simple, clean Telegram bot built with **Aiogram 3.x** that downloads videos from
-TikTok, Instagram, YouTube, Facebook, and Twitter (X) using **yt-dlp**, then tries
-to identify the background music using **FFmpeg** + **ACRCloud**.
+A simple, clean Telegram bot built with **Aiogram 3.x** that downloads videos and photos from
+Instagram (Reels, Posts, Carousel), Pinterest (Images, Videos), TikTok, YouTube, Facebook, and Twitter (X) using **yt-dlp**, then tries
+to identify the background music for videos using **FFmpeg** + **ACRCloud**.
 
 No Docker, no Redis, no Celery, no Django — just Python, SQLite, and a handful of
 well-organized modules.
@@ -11,7 +11,7 @@ well-organized modules.
 
 - `/start` welcome message with supported platforms
 - Mandatory channel subscription (with a "✅ Check Subscription" button)
-- Video downloading via yt-dlp (TikTok, Instagram, YouTube, Facebook, Twitter/X)
+- Media downloading (Instagram Posts/Reels/Carousels, Pinterest Images/Videos, TikTok, YouTube, Facebook, Twitter/X)
 - Music recognition via ACRCloud after each download
 - Full in-Telegram admin panel (`/admin`):
   - 👥 Users (view total, search by ID, block/unblock)

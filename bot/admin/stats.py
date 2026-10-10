@@ -20,7 +20,8 @@ async def show_stats(callback: CallbackQuery):
         f"📥 Total downloads: <b>{stats['total_downloads']}</b>\n"
         f"  • TikTok: <b>{stats['tiktok']}</b>\n"
         f"  • Instagram: <b>{stats['instagram']}</b>\n"
-        f"  • YouTube: <b>{stats['youtube']}</b>\n\n"
+        f"  • YouTube: <b>{stats['youtube']}</b>\n"
+        f"  • Pinterest: <b>{stats.get('pinterest', 0)}</b>\n\n"
         f"🎵 Songs recognized: <b>{stats['recognized']}</b>\n"
         f"❌ Failed recognitions: <b>{stats['failed_recognitions']}</b>"
     )
