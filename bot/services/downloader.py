@@ -12,7 +12,13 @@ import requests
 import yt_dlp
 from yt_dlp.extractor.instagram import InstagramIE
 
-from bot.config import DOWNLOADS_DIR, MAX_VIDEO_SIZE_MB, FFMPEG_PATH
+from bot.config import (
+    DOWNLOADS_DIR,
+    MAX_VIDEO_SIZE_MB,
+    FFMPEG_PATH,
+    INSTAGRAM_USERNAME,
+    INSTAGRAM_PASSWORD,
+)
 
 
 # Monkey-patch InstagramIE to prevent raising ExtractorError on photo-only posts
@@ -184,6 +190,9 @@ def _download_instagram(url: str) -> list[MediaItem]:
         "quiet": True,
         "no_warnings": True,
     }
+    if INSTAGRAM_USERNAME and INSTAGRAM_PASSWORD:
+        ydl_opts["username"] = INSTAGRAM_USERNAME
+        ydl_opts["password"] = INSTAGRAM_PASSWORD
 
     # Extract metadata without downloading first
     info = None
@@ -271,6 +280,10 @@ def _download_video_with_ytdlp(url: str) -> str:
     cookies_path = _get_cookies_path()
     if cookies_path:
         ydl_opts["cookiefile"] = cookies_path
+
+    if detect_platform(url) == "Instagram" and INSTAGRAM_USERNAME and INSTAGRAM_PASSWORD:
+        ydl_opts["username"] = INSTAGRAM_USERNAME
+        ydl_opts["password"] = INSTAGRAM_PASSWORD
 
     if FFMPEG_PATH:
         ydl_opts["ffmpeg_location"] = FFMPEG_PATH

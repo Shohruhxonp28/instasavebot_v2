@@ -19,6 +19,10 @@ ACR_HOST: str = os.getenv("ACR_HOST", "")
 ACR_ACCESS_KEY: str = os.getenv("ACR_ACCESS_KEY", "")
 ACR_ACCESS_SECRET: str = os.getenv("ACR_ACCESS_SECRET", "")
 
+# Optional: Instagram account credentials
+INSTAGRAM_USERNAME: str = os.getenv("INSTAGRAM_USERNAME", "")
+INSTAGRAM_PASSWORD: str = os.getenv("INSTAGRAM_PASSWORD", "")
+
 # Database
 DB_PATH: str = os.getenv("DB_PATH", "bot_database.db")
 
