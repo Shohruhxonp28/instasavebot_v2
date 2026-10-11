@@ -1,4 +1,7 @@
+import logging
 import re
+
+logger = logging.getLogger(__name__)
 
 from aiogram import Router, F
 from aiogram.types import Message, FSInputFile, InputMediaPhoto, InputMediaVideo
@@ -48,17 +51,21 @@ async def handle_video_link(message: Message):
     audio_path = None
     try:
         items = download_media(url)
-    except DownloadError:
+    except DownloadError as e:
+        logger.error("DownloadError for url %s: %s", url, e)
         await log_download(message.from_user.id, platform, success=False)
         await status_message.edit_text(
-            "😔 Sorry, I couldn't download this media. "
-            "The link might be private, unsupported, or unavailable."
+            f"😔 Sorry, I couldn't download this media.\n\n"
+            f"<b>Details:</b> <code>{str(e)[:200]}</code>\n\n"
+            "The link might be private, unsupported, or temporarily unavailable."
         )
         return
-    except Exception:
+    except Exception as e:
+        logger.exception("Unexpected error downloading %s: %s", url, e)
         await log_download(message.from_user.id, platform, success=False)
         await status_message.edit_text(
-            "😔 An error occurred while downloading this media. Please try again later."
+            f"😔 An error occurred while downloading this media.\n\n"
+            f"<b>Details:</b> <code>{str(e)[:200]}</code>"
         )
         return
 
