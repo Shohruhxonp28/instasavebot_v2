@@ -91,28 +91,12 @@ cd ~/www/instasavebot/instasavebot_v2
 
 ---
 
-### 2-qadam. FFmpeg ni sozlash
+### 2-qadam. FFmpeg (Avtomatik sozlanadi!)
 
-#### A variant: Oddiy VPS / Ubuntu / Debian (Root huquqi bo'lsa):
-```bash
-sudo apt update
-sudo apt install -y ffmpeg
-```
-
-#### B variant: PaaS / Shared Hosting (Root yoki `sudo` huquqi bo'lmaganda):
-Agar serveringizda `sudo` ishlamasa, statik FFmpeg binary faylini to'g'ridan-to'g'ri o'zingizning katalogingizga yuklab oling:
-```bash
-mkdir -p ~/bin
-cd ~/bin
-wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
-tar -xf ffmpeg-release-amd64-static.tar.xz --strip-components=1
-rm ffmpeg-release-amd64-static.tar.xz
-```
-Tekshirish:
-```bash
-~/bin/ffmpeg -version
-```
-*(Bunday holda `.env` faylida `FFMPEG_PATH=/home/username/bin/ffmpeg` deb ko'rsatiladi).*
+Botimiz **`static-ffmpeg`** texnologiyasi bilan jihozlangan. Shuning uchun:
+- **Serverda `sudo apt install ffmpeg` qilish SHART EMAS!**
+- PaaS yoki shared hosting serverlarida ham bot ishga tushishi bilan o'zi avtomatik tarzda statik FFmpeg'ni faollashtiradi.
+- Hech qanday qo'shimcha binary yuklab olish yoki `.env` da `FFMPEG_PATH` ko'rsatish shart emas.
 
 ---
 

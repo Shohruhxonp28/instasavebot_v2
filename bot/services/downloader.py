@@ -12,6 +12,12 @@ import requests
 import yt_dlp
 from yt_dlp.extractor.instagram import InstagramIE
 
+try:
+    import static_ffmpeg
+    static_ffmpeg.add_paths()
+except Exception:
+    pass
+
 from bot.config import (
     DOWNLOADS_DIR,
     MAX_VIDEO_SIZE_MB,

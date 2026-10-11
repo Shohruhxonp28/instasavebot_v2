@@ -20,6 +20,14 @@ from bot.admin import settings as admin_settings
 
 logging.basicConfig(level=logging.INFO)
 
+# Automatically enable static-ffmpeg on Linux/Windows without needing root/sudo
+try:
+    import static_ffmpeg
+    static_ffmpeg.add_paths()
+    logging.info("static_ffmpeg paths initialized successfully.")
+except Exception as e:
+    logging.warning("static_ffmpeg initialization skipped or failed: %s", e)
+
 
 async def main():
     if not BOT_TOKEN:
