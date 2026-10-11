@@ -406,23 +406,26 @@ def download_media(url: str) -> list[MediaItem]:
         except Exception:
             pass
 
-    # 3. Instagram (yt-dlp patched extractor + fallback)
+    # 3. Instagram - Primary: universalDownloader, Fallback: yt-dlp
     if platform == "Instagram":
+        # First choice: universalDownloader (Snapsave)
+        try:
+            resp = call_universal_downloader(url, "meta")
+            if resp:
+                u_items = parse_and_download_universal(resp)
+                if u_items:
+                    return [
+                        MediaItem(media_type=it.media_type, file_path=it.file_path, caption=it.caption)
+                        for it in u_items
+                    ]
+        except Exception:
+            pass
+
+        # Fallback choice: yt-dlp patched extractor
         try:
             return _download_instagram(url)
         except Exception:
-            # Fallback to universalDownloader meta scraper
-            try:
-                resp = call_universal_downloader(url, "meta")
-                if resp:
-                    u_items = parse_and_download_universal(resp)
-                    if u_items:
-                        return [
-                            MediaItem(media_type=it.media_type, file_path=it.file_path, caption=it.caption)
-                            for it in u_items
-                        ]
-            except Exception:
-                pass
+            pass
 
     # 4. Generic download using yt-dlp
     try:

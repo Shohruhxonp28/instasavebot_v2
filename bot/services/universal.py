@@ -72,14 +72,16 @@ def call_universal_downloader(url: str, platform: str | None = None) -> dict | N
         return None
 
 
-def download_remote_file(url: str, ext: str = "mp4") -> str:
-    """Download a direct remote file to the downloads directory."""
+def download_remote_file(
+    url: str,
+    preferred_ext: str | None = None,
+    preferred_type: Literal["video", "photo", "audio"] | None = None,
+) -> tuple[str, Literal["video", "photo", "audio"]]:
+    """Download a direct remote file to the downloads directory with automatic Content-Type detection."""
     import uuid
     import requests
 
     file_id = str(uuid.uuid4())
-    file_path = os.path.join(DOWNLOADS_DIR, f"{file_id}.{ext}")
-
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -87,11 +89,34 @@ def download_remote_file(url: str, ext: str = "mp4") -> str:
             "Chrome/124.0.0.0 Safari/537.36"
         )
     }
-    resp = requests.get(url, headers=headers, stream=True, timeout=30)
+    resp = requests.get(url, headers=headers, stream=True, timeout=35)
     resp.raise_for_status()
 
+    # Detect media type from Content-Type header or URL
+    content_type = (resp.headers.get("content-type") or "").lower()
+    media_type: Literal["video", "photo", "audio"] = preferred_type or "video"
+    ext = preferred_ext or "mp4"
+
+    if "image/" in content_type:
+        media_type = "photo"
+        ext = "jpg"
+    elif "audio/" in content_type:
+        media_type = "audio"
+        ext = "mp3"
+    elif "video/" in content_type:
+        media_type = "video"
+        ext = "mp4"
+    elif any(x in url.lower() for x in (".jpg", ".jpeg", ".png", ".webp")):
+        media_type = "photo"
+        ext = "jpg"
+    elif any(x in url.lower() for x in (".mp3", ".m4a", ".ogg")):
+        media_type = "audio"
+        ext = "mp3"
+
+    file_path = os.path.join(DOWNLOADS_DIR, f"{file_id}.{ext}")
     max_bytes = MAX_VIDEO_SIZE_MB * 1024 * 1024
     total_bytes = 0
+
     with open(file_path, "wb") as f:
         for chunk in resp.iter_content(chunk_size=8192):
             if chunk:
@@ -100,7 +125,35 @@ def download_remote_file(url: str, ext: str = "mp4") -> str:
                     raise Exception(f"File exceeds maximum size of {MAX_VIDEO_SIZE_MB}MB.")
                 f.write(chunk)
 
-    return file_path
+    # Magic bytes check for guaranteed accurate media type detection
+    try:
+        with open(file_path, "rb") as f:
+            head = f.read(32)
+
+        detected_type = media_type
+        new_ext = ext
+
+        if head.startswith(b"\xff\xd8\xff") or head.startswith(b"\x89PNG") or (head.startswith(b"RIFF") and b"WEBP" in head):
+            detected_type = "photo"
+            new_ext = "jpg"
+        elif b"ftyp" in head or head.startswith(b"\x1aE\xdf\xa3") or b"moov" in head or head.startswith(b"\x00\x00\x00"):
+            detected_type = "video"
+            new_ext = "mp4"
+        elif head.startswith(b"ID3") or head.startswith(b"\xff\xfb") or head.startswith(b"OggS") or head.startswith(b"fLaC"):
+            detected_type = "audio"
+            new_ext = "mp3"
+
+        if new_ext != ext:
+            new_path = file_path.rsplit(".", 1)[0] + f".{new_ext}"
+            if os.path.exists(new_path):
+                os.remove(new_path)
+            os.rename(file_path, new_path)
+            file_path = new_path
+            media_type = detected_type
+    except Exception:
+        pass
+
+    return file_path, media_type
 
 
 def parse_and_download_universal(resp_data: dict) -> list[UniversalMediaItem]:
@@ -114,16 +167,42 @@ def parse_and_download_universal(resp_data: dict) -> list[UniversalMediaItem]:
     if not data:
         return items
 
-    # 1. Threads
-    if platform == "threads":
+    # 1. Meta (Instagram & Facebook via Snapsave)
+    if platform in ("meta", "instagram", "facebook"):
+        items_list = []
+        if isinstance(data, dict):
+            if isinstance(data.get("data"), list):
+                items_list = data["data"]
+            elif isinstance(data.get("media"), list):
+                items_list = data["media"]
+            elif data.get("url"):
+                items_list = [data]
+        elif isinstance(data, list):
+            items_list = data
+
+        for entry in items_list:
+            if not isinstance(entry, dict):
+                continue
+            media_url = entry.get("url") or entry.get("download_url") or entry.get("video")
+            if not media_url:
+                continue
+
+            try:
+                fpath, mtype = download_remote_file(media_url)
+                items.append(UniversalMediaItem(media_type=mtype, file_path=fpath))
+            except Exception as e:
+                logger.warning("Failed to download Meta item: %s", e)
+
+    # 2. Threads
+    elif platform == "threads":
         # Photos
         for photo in data.get("photos", []):
             variants = photo.get("variants", [])
             img_url = variants[0].get("url") if variants else photo.get("thumbnail")
             if img_url:
                 try:
-                    fpath = download_remote_file(img_url, ext="jpg")
-                    items.append(UniversalMediaItem(media_type="photo", file_path=fpath))
+                    fpath, mtype = download_remote_file(img_url, preferred_ext="jpg", preferred_type="photo")
+                    items.append(UniversalMediaItem(media_type=mtype, file_path=fpath))
                 except Exception as e:
                     logger.warning("Failed to download Threads photo: %s", e)
         # Videos
@@ -131,70 +210,66 @@ def parse_and_download_universal(resp_data: dict) -> list[UniversalMediaItem]:
             v_url = video.get("url")
             if v_url:
                 try:
-                    fpath = download_remote_file(v_url, ext="mp4")
-                    items.append(UniversalMediaItem(media_type="video", file_path=fpath))
+                    fpath, mtype = download_remote_file(v_url, preferred_ext="mp4", preferred_type="video")
+                    items.append(UniversalMediaItem(media_type=mtype, file_path=fpath))
                 except Exception as e:
                     logger.warning("Failed to download Threads video: %s", e)
 
-    # 2. Bluesky
+    # 3. Bluesky
     elif platform == "bluesky":
         caption = data.get("caption") or ""
         for photo in data.get("photos", []):
             p_url = photo.get("url") or photo.get("thumbnail")
             if p_url:
                 try:
-                    fpath = download_remote_file(p_url, ext="jpg")
-                    items.append(UniversalMediaItem(media_type="photo", file_path=fpath, caption=caption))
+                    fpath, mtype = download_remote_file(p_url, preferred_ext="jpg", preferred_type="photo")
+                    items.append(UniversalMediaItem(media_type=mtype, file_path=fpath, caption=caption))
                 except Exception:
                     pass
         for video in data.get("videos", []):
             v_url = video.get("url")
             if v_url:
                 try:
-                    fpath = download_remote_file(v_url, ext="mp4")
-                    items.append(UniversalMediaItem(media_type="video", file_path=fpath, caption=caption))
+                    fpath, mtype = download_remote_file(v_url, preferred_ext="mp4", preferred_type="video")
+                    items.append(UniversalMediaItem(media_type=mtype, file_path=fpath, caption=caption))
                 except Exception:
                     pass
 
-    # 3. Douyin
+    # 4. Douyin
     elif platform == "douyin":
         title = data.get("title") or ""
         links = data.get("links", [])
         if links:
-            # Pick first high quality link
             v_url = links[0].get("url")
             if v_url:
                 try:
-                    fpath = download_remote_file(v_url, ext="mp4")
-                    items.append(UniversalMediaItem(media_type="video", file_path=fpath, caption=title))
+                    fpath, mtype = download_remote_file(v_url, preferred_ext="mp4", preferred_type="video")
+                    items.append(UniversalMediaItem(media_type=mtype, file_path=fpath, caption=title))
                 except Exception:
                     pass
 
-    # 4. CapCut
+    # 5. CapCut
     elif platform == "capcut":
         title = data.get("title") or ""
-        v_url = data.get("video_url") or data.get("url")
-        if not v_url and isinstance(data, dict):
-            # Check nested
-            v_url = data.get("download_url") or data.get("media_url")
+        v_url = data.get("video_url") or data.get("url") or data.get("download_url") or data.get("media_url")
         if v_url:
             try:
-                fpath = download_remote_file(v_url, ext="mp4")
-                items.append(UniversalMediaItem(media_type="video", file_path=fpath, caption=title))
+                fpath, mtype = download_remote_file(v_url, preferred_ext="mp4", preferred_type="video")
+                items.append(UniversalMediaItem(media_type=mtype, file_path=fpath, caption=title))
             except Exception:
                 pass
 
-    # 5. Snapchat
+    # 6. Snapchat
     elif platform == "snapchat":
         v_url = data.get("video_url") or data.get("url") or data.get("download_url")
         if v_url:
             try:
-                fpath = download_remote_file(v_url, ext="mp4")
-                items.append(UniversalMediaItem(media_type="video", file_path=fpath))
+                fpath, mtype = download_remote_file(v_url, preferred_ext="mp4", preferred_type="video")
+                items.append(UniversalMediaItem(media_type=mtype, file_path=fpath))
             except Exception:
                 pass
 
-    # 6. Spotify
+    # 7. Spotify
     elif platform == "spotify":
         title = data.get("title") or data.get("songTitle") or "Spotify Track"
         artist = data.get("artist") or ""
@@ -202,39 +277,37 @@ def parse_and_download_universal(resp_data: dict) -> list[UniversalMediaItem]:
         audio_url = data.get("downloadUrl") or data.get("url") or data.get("audio") or data.get("link")
         if audio_url:
             try:
-                fpath = download_remote_file(audio_url, ext="mp3")
-                items.append(UniversalMediaItem(media_type="audio", file_path=fpath, caption=caption))
+                fpath, mtype = download_remote_file(audio_url, preferred_ext="mp3", preferred_type="audio")
+                items.append(UniversalMediaItem(media_type=mtype, file_path=fpath, caption=caption))
             except Exception:
                 pass
 
-    # 7. TeraBox
+    # 8. TeraBox
     elif platform == "terabox":
         v_url = data.get("download_link") or data.get("fast_download_link") or data.get("url")
         if v_url:
             try:
-                fpath = download_remote_file(v_url, ext="mp4")
-                items.append(UniversalMediaItem(media_type="video", file_path=fpath))
+                fpath, mtype = download_remote_file(v_url, preferred_ext="mp4", preferred_type="video")
+                items.append(UniversalMediaItem(media_type=mtype, file_path=fpath))
             except Exception:
                 pass
 
-    # 8. TikTok (SSSTik fallback)
+    # 9. TikTok (SSSTik fallback)
     elif platform == "tiktok":
         title = data.get("title") or ""
         downloads = data.get("downloads", [])
-        # Find first video download link
         for dl in downloads:
             url_dl = dl.get("url")
             if url_dl and (".mp4" in url_dl.lower() or "video" in dl.get("text", "").lower() or not dl.get("text")):
                 try:
-                    fpath = download_remote_file(url_dl, ext="mp4")
-                    items.append(UniversalMediaItem(media_type="video", file_path=fpath, caption=title))
+                    fpath, mtype = download_remote_file(url_dl, preferred_ext="mp4", preferred_type="video")
+                    items.append(UniversalMediaItem(media_type=mtype, file_path=fpath, caption=title))
                     break
                 except Exception:
                     pass
 
-    # 9. Generic fallback: check common URL fields
+    # 10. Generic fallback: check common URL fields
     if not items:
-        # Inspect for common fields
         url_candidates = []
         if isinstance(data, dict):
             for k in ("url", "download_url", "video_url", "media_url", "direct_url", "video"):
@@ -246,17 +319,8 @@ def parse_and_download_universal(resp_data: dict) -> list[UniversalMediaItem]:
                         url_candidates.append(d["url"])
 
         for cand in url_candidates:
-            ext = "mp4"
-            mtype: Literal["video", "photo", "audio"] = "video"
-            if any(cand.lower().endswith(x) for x in (".jpg", ".jpeg", ".png", ".webp")):
-                ext = "jpg"
-                mtype = "photo"
-            elif any(cand.lower().endswith(x) for x in (".mp3", ".m4a", ".ogg")):
-                ext = "mp3"
-                mtype = "audio"
-
             try:
-                fpath = download_remote_file(cand, ext=ext)
+                fpath, mtype = download_remote_file(cand)
                 items.append(UniversalMediaItem(media_type=mtype, file_path=fpath))
                 break
             except Exception:
