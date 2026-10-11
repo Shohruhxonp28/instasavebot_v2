@@ -221,13 +221,28 @@ python3 -m bot.main
 
 ---
 
-## ⚠️ Muhim eslatmalar
+## ⚙️ universalDownloader qanday ishlaydi?
 
-- **Telegram Bot API limiti**: Telegram botlar to'g'ridan-to'g'ri maksimal **50 MB** gacha bo'lgan fayllarni yubora oladi. `MAX_VIDEO_SIZE_MB` dan katta fayllar foydalanuvchiga ogohlantirish bilan rad etiladi.
-- **Xotirani tozalash**: Har bir so'rov bajarilgandan so'ng vaqtinchalik yuklangan barcha videolar, fotosuratlar va audio fayllar darhol o'chiriladi. Server diskida ortiqcha fayllar saqlanmaydi.
-- **universalDownloader standalone API**: Agar Node.js API serverini mustaqil ishlatmoqchi bo'lsangiz:
+- **Bot uchun alohida ishga tushirish SHART EMAS!**
+  Sizdan talab qilinadigan yagona narsa — serverda bir marta uning paketlarini o'rnatish:
+  ```bash
+  cd universalDownloader
+  npm install
+  cd ..
+  ```
+  Foydalanuvchi Telegram orqali havola yuborganida, Python boti fon rejimida `cli.js` orqali universalDownloader dvigatelini **avtomatik ravishda o'zi chaqiradi**, mediani yuklab oladi va foydalanuvchiga yuboradi. Ya'ni alohida server yoki port ochib yurishingiz shart emas.
+
+- **Mustaqil Web API server sifatida ishlatish (Ixtiyoriy):**
+  Agar ushbu API'dan botdan tashqari, o'zingizning veb-saytingiz yoki boshqa ilovalaringiz uchun alohida HTTP API sifatida foydalanmoqchi bo'lsangiz:
   ```bash
   cd universalDownloader
   npm start
   ```
-  API standart `http://localhost:3000` portida ishga tushadi.
+  Standart holda `http://localhost:3000` portida ishga tushadi.
+
+---
+
+## ⚠️ Muhim eslatmalar
+
+- **Telegram Bot API limiti**: Telegram botlar to'g'ridan-to'g'ri maksimal **50 MB** gacha bo'lgan fayllarni yubora oladi. `MAX_VIDEO_SIZE_MB` dan katta fayllar foydalanuvchiga ogohlantirish bilan rad etiladi.
+- **Xotirani tozalash**: Har bir so'rov bajarilgandan so'ng vaqtinchalik yuklangan barcha videolar, fotosuratlar va audio fayllar darhol o'chiriladi. Server diskida ortiqcha fayllar saqlanmaydi.
