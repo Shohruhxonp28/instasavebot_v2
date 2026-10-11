@@ -17,3 +17,7 @@ downloads/
 # Installers
 *.exe
 python_installer.exe
+
+# Node
+node_modules/
+universalDownloader/node_modules/

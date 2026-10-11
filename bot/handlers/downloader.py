@@ -75,6 +75,11 @@ async def handle_video_link(message: Message):
                     FSInputFile(item.file_path),
                     caption=item.caption or "✅ Here is your video!",
                 )
+            elif item.media_type == "audio":
+                await message.answer_audio(
+                    FSInputFile(item.file_path),
+                    caption=item.caption or "✅ Here is your audio!",
+                )
             else:
                 await message.answer_photo(
                     FSInputFile(item.file_path),

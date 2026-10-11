@@ -32,9 +32,15 @@ def _patched_raise_no_formats(self, msg, *args, **kwargs):
 InstagramIE.raise_no_formats = _patched_raise_no_formats
 
 
+from bot.services.universal import (
+    call_universal_downloader,
+    parse_and_download_universal,
+)
+
+
 @dataclass
 class MediaItem:
-    media_type: Literal["video", "photo"]
+    media_type: Literal["video", "photo", "audio"]
     file_path: str
     caption: str = ""
 
@@ -48,10 +54,36 @@ def detect_platform(url: str) -> str:
     url = url.lower()
     if "tiktok.com" in url:
         return "TikTok"
+    if "douyin.com" in url:
+        return "Douyin"
+    if "kuaishou.com" in url:
+        return "Kuaishou"
     if "instagram.com" in url:
         return "Instagram"
     if "pinterest.com" in url or "pin.it" in url:
         return "Pinterest"
+    if "threads.net" in url:
+        return "Threads"
+    if "spotify.com" in url or "open.spotify" in url:
+        return "Spotify"
+    if "snapchat.com" in url:
+        return "Snapchat"
+    if "capcut.com" in url:
+        return "CapCut"
+    if any(x in url for x in ("terabox", "1024tera", "terafileshare")):
+        return "TeraBox"
+    if "soundcloud.com" in url:
+        return "SoundCloud"
+    if "bsky.app" in url:
+        return "Bluesky"
+    if "reddit.com" in url:
+        return "Reddit"
+    if "dailymotion.com" in url:
+        return "Dailymotion"
+    if "tumblr.com" in url:
+        return "Tumblr"
+    if "linkedin.com" in url:
+        return "LinkedIn"
     if "youtube.com" in url or "youtu.be" in url:
         return "YouTube"
     if "facebook.com" in url or "fb.watch" in url:
@@ -335,19 +367,80 @@ def _download_generic(url: str) -> list[MediaItem]:
 
 def download_media(url: str) -> list[MediaItem]:
     """
-    Download media (photos, videos, carousels) from supported platforms.
+    Download media (photos, videos, carousels, audio) from supported platforms.
     Returns a list of MediaItem objects.
     Raises DownloadError on failure.
     """
     url = normalize_url(url)
     platform = detect_platform(url)
 
-    if platform == "Pinterest":
-        return _download_pinterest(url)
-    if platform == "Instagram":
-        return _download_instagram(url)
+    # 1. Dedicated platforms handled directly by universalDownloader
+    universal_first = {
+        "Threads",
+        "Spotify",
+        "Snapchat",
+        "CapCut",
+        "TeraBox",
+        "Douyin",
+        "Kuaishou",
+        "Bluesky",
+        "SoundCloud",
+    }
+    if platform in universal_first:
+        try:
+            resp = call_universal_downloader(url)
+            if resp:
+                u_items = parse_and_download_universal(resp)
+                if u_items:
+                    return [
+                        MediaItem(media_type=it.media_type, file_path=it.file_path, caption=it.caption)
+                        for it in u_items
+                    ]
+        except Exception:
+            pass
 
-    return _download_generic(url)
+    # 2. Pinterest (high-res API + fallback)
+    if platform == "Pinterest":
+        try:
+            return _download_pinterest(url)
+        except Exception:
+            pass
+
+    # 3. Instagram (yt-dlp patched extractor + fallback)
+    if platform == "Instagram":
+        try:
+            return _download_instagram(url)
+        except Exception:
+            # Fallback to universalDownloader meta scraper
+            try:
+                resp = call_universal_downloader(url, "meta")
+                if resp:
+                    u_items = parse_and_download_universal(resp)
+                    if u_items:
+                        return [
+                            MediaItem(media_type=it.media_type, file_path=it.file_path, caption=it.caption)
+                            for it in u_items
+                        ]
+            except Exception:
+                pass
+
+    # 4. Generic download using yt-dlp
+    try:
+        return _download_generic(url)
+    except Exception as e:
+        # Final fallback: try universalDownloader engine
+        try:
+            resp = call_universal_downloader(url)
+            if resp:
+                u_items = parse_and_download_universal(resp)
+                if u_items:
+                    return [
+                        MediaItem(media_type=it.media_type, file_path=it.file_path, caption=it.caption)
+                        for it in u_items
+                    ]
+        except Exception:
+            pass
+        raise e
 
 
 def download_video(url: str) -> str:

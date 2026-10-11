@@ -45,8 +45,12 @@ FFMPEG_PATH: str = os.getenv("FFMPEG_PATH", "")
 SUPPORTED_PLATFORMS = [
     "Instagram (Reels, Posts, Carousel)",
     "Pinterest",
-    "TikTok",
+    "TikTok & Douyin",
+    "Threads",
+    "Spotify & SoundCloud",
+    "Snapchat & CapCut",
     "YouTube",
     "Facebook",
     "Twitter (X)",
+    "TeraBox & Reddit",
 ]

@@ -1,17 +1,23 @@
 # Telegram Media Downloader Bot
 
-A simple, clean Telegram bot built with **Aiogram 3.x** that downloads videos and photos from
-Instagram (Reels, Posts, Carousel), Pinterest (Images, Videos), TikTok, YouTube, Facebook, and Twitter (X) using **yt-dlp**, then tries
-to identify the background music for videos using **FFmpeg** + **ACRCloud**.
+A powerful and clean Telegram bot built with **Aiogram 3.x** and **universalDownloader (Node.js)** that downloads videos, photos, carousels, and audios from:
+- **Instagram** (Reels, Posts, Carousel albums)
+- **Pinterest** (Images, Videos)
+- **TikTok & Douyin** (Watermark-free videos & photos)
+- **Threads** (Photos & Videos)
+- **Spotify & SoundCloud** (Audio tracks)
+- **Snapchat & CapCut** (Videos)
+- **TeraBox** (Direct files & videos)
+- **YouTube, Facebook, Twitter (X)**
+- **Reddit, Bluesky, Dailymotion, Tumblr, LinkedIn**
 
-No Docker, no Redis, no Celery, no Django — just Python, SQLite, and a handful of
-well-organized modules.
+Also automatically recognizes background music in videos using **FFmpeg** + **ACRCloud**.
 
 ## Features
 
 - `/start` welcome message with supported platforms
 - Mandatory channel subscription (with a "✅ Check Subscription" button)
-- Media downloading (Instagram Posts/Reels/Carousels, Pinterest Images/Videos, TikTok, YouTube, Facebook, Twitter/X)
+- Multi-platform media downloading (yt-dlp + universalDownloader hybrid engine)
 - Music recognition via ACRCloud after each download
 - Full in-Telegram admin panel (`/admin`):
   - 👥 Users (view total, search by ID, block/unblock)
@@ -26,16 +32,23 @@ well-organized modules.
 project/
 │
 ├── bot/
-│   ├── handlers/       # user-facing handlers (start, video downloader)
+│   ├── handlers/       # user-facing handlers (start, downloader)
 │   ├── admin/          # admin panel handlers
 │   ├── keyboards/      # inline keyboard builders
-│   ├── services/       # yt-dlp, ffmpeg, ACRCloud, subscription logic
+│   ├── services/       # yt-dlp, universalDownloader bridge, ACRCloud
 │   ├── database/       # SQLite connection + queries
 │   ├── utils/          # FSM states, admin filter
 │   ├── config.py       # environment-based configuration
 │   └── main.py         # entry point
 │
-├── downloads/          # temporary downloaded videos (auto-cleaned)
+├── universalDownloader/ # Node.js multi-platform downloader engine
+│   ├── services/       # platform scrapers (Threads, Spotify, CapCut, etc.)
+│   ├── controllers/    # API controllers
+│   ├── routes/         # Express routes
+│   ├── cli.js          # CLI bridge for Python integration
+│   └── index.js        # standalone Express API server
+│
+├── downloads/          # temporary downloaded files (auto-cleaned)
 ├── media/              # temporary extracted audio (auto-cleaned)
 ├── requirements.txt
 ├── .env.example
