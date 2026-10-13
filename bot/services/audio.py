@@ -6,7 +6,14 @@ import uuid
 import subprocess
 from bot.config import MEDIA_DIR, FFMPEG_PATH
 
+try:
+    import static_ffmpeg
+    static_ffmpeg.add_paths()
+except Exception:
+    pass
+
 FFMPEG_BIN = FFMPEG_PATH if FFMPEG_PATH else "ffmpeg"
+
 
 
 class AudioExtractionError(Exception):
@@ -46,9 +53,49 @@ def extract_audio(video_path: str, duration_seconds: int = 20) -> str:
         raise AudioExtractionError("FFmpeg timed out.") from e
 
 
+def extract_full_audio(
+    video_path: str,
+    title: str | None = None,
+    artist: str | None = None,
+) -> str:
+    """
+    Extract the full audio from a video file as MP3.
+    Returns the path to the generated MP3 file.
+    """
+    audio_path = os.path.join(MEDIA_DIR, f"{uuid.uuid4()}.mp3")
+
+    command = [
+        FFMPEG_BIN,
+        "-y",
+        "-i", video_path,
+        "-vn",
+        "-c:a", "libmp3lame",
+        "-q:a", "2",
+    ]
+    if title:
+        command.extend(["-metadata", f"title={title}"])
+    if artist:
+        command.extend(["-metadata", f"artist={artist}"])
+    command.append(audio_path)
+
+    try:
+        result = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=180,
+        )
+        if result.returncode != 0 or not os.path.exists(audio_path) or os.path.getsize(audio_path) == 0:
+            raise AudioExtractionError(result.stderr.decode(errors="ignore"))
+        return audio_path
+    except subprocess.TimeoutExpired as e:
+        raise AudioExtractionError("FFmpeg timed out while extracting full audio.") from e
+
+
 def cleanup_file(file_path: str) -> None:
     try:
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
     except OSError:
         pass
+
