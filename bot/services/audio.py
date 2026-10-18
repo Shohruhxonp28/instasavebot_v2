@@ -99,3 +99,47 @@ def cleanup_file(file_path: str) -> None:
     except OSError:
         pass
 
+
+def download_audio_by_query(query: str) -> str | None:
+    """
+    Search and download a full studio track as MP3 using yt-dlp.
+    Returns the path to the downloaded MP3 file or None on failure.
+    """
+    import yt_dlp
+    from bot.config import DOWNLOADS_DIR
+
+    file_id = str(uuid.uuid4())
+    output_template = os.path.join(DOWNLOADS_DIR, f"{file_id}.%(ext)s")
+
+    ydl_opts = {
+        "format": "bestaudio/best",
+        "outtmpl": output_template,
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }],
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "max_filesize": 40 * 1024 * 1024,
+    }
+    if FFMPEG_PATH:
+        ydl_opts["ffmpeg_location"] = FFMPEG_PATH
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch1:{query} audio", download=True)
+            if not info or not info.get("entries"):
+                return None
+            expected_mp3 = os.path.join(DOWNLOADS_DIR, f"{file_id}.mp3")
+            if os.path.exists(expected_mp3):
+                return expected_mp3
+            for ext in (".mp3", ".m4a", ".opus", ".webm"):
+                cand = os.path.join(DOWNLOADS_DIR, f"{file_id}{ext}")
+                if os.path.exists(cand):
+                    return cand
+            return None
+    except Exception:
+        return None
+

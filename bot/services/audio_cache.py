@@ -12,6 +12,7 @@ class CachedAudio:
     title: str
     artist: str
     bot_username: str
+    video_caption: str = ""
     file_id: str | None = None
     created_at: float = 0.0
 
@@ -28,6 +29,7 @@ class AudioCache:
         title: str,
         artist: str,
         bot_username: str,
+        video_caption: str = "",
     ) -> None:
         self.cleanup_expired()
         self._cache[token] = CachedAudio(
@@ -35,6 +37,7 @@ class AudioCache:
             title=title,
             artist=artist,
             bot_username=bot_username,
+            video_caption=video_caption,
             created_at=time.time(),
         )
 

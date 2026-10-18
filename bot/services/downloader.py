@@ -417,6 +417,9 @@ def download_media(url: str) -> list[MediaItem]:
         except Exception:
             pass
 
+        if platform == "Spotify":
+            raise DownloadError("Spotify musiqasini yuklab bo'lmadi. Trek mavjud emas yoki hududiy cheklov mavjud.")
+
     # 2. Twitter / X (try universalDownloader first, then yt-dlp)
     if platform == "Twitter (X)":
         try:

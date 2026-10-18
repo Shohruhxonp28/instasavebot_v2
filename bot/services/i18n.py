@@ -176,6 +176,21 @@ TEXTS = {
         "ru": "📥 Скачать аудио/музыку",
         "en": "📥 Download Music",
     },
+    "audio_searching": {
+        "uz": "🔍 <b>Videodagi musiqa qidirilmoqda...</b>",
+        "ru": "🔍 <b>Поиск музыки из видео...</b>",
+        "en": "🔍 <b>Searching for music in video...</b>",
+    },
+    "audio_found": {
+        "uz": "🎶 Musiqa topildi: <b>{artist} - {title}</b>\n📥 Yuklanmoqda...",
+        "ru": "🎶 Музыка найдена: <b>{artist} - {title}</b>\n📥 Загрузка...",
+        "en": "🎶 Music found: <b>{artist} - {title}</b>\n📥 Downloading...",
+    },
+    "audio_caption_found": {
+        "uz": "🎵 <b>{artist} - {title}</b>\n\n🎬 @{bot_username} orqali topildi va yuklandi",
+        "ru": "🎵 <b>{artist} - {title}</b>\n\n🎬 Найдено и скачано с помощью @{bot_username}",
+        "en": "🎵 <b>{artist} - {title}</b>\n\n🎬 Found and downloaded via @{bot_username}",
+    },
     "audio_sending": {
         "uz": "📥 Qo'shiq yuborilmoqda...",
         "ru": "📥 Аудиодорожка отправляется...",

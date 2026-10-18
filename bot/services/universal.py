@@ -271,16 +271,32 @@ def parse_and_download_universal(resp_data: dict) -> list[UniversalMediaItem]:
 
     # 7. Spotify
     elif platform == "spotify":
-        title = data.get("title") or data.get("songTitle") or "Spotify Track"
-        artist = data.get("artist") or ""
+        meta = {}
+        if isinstance(data, dict):
+            if isinstance(data.get("data"), dict) and isinstance(data["data"].get("metadata"), dict):
+                meta = data["data"]["metadata"]
+            elif isinstance(data.get("metadata"), dict):
+                meta = data["metadata"]
+            else:
+                meta = data
+
+        title = meta.get("name") or meta.get("title") or meta.get("songTitle") or "Spotify Track"
+        artist = meta.get("artist") or ""
         caption = f"🎵 {title} - {artist}" if artist else f"🎵 {title}"
-        audio_url = data.get("downloadUrl") or data.get("url") or data.get("audio") or data.get("link")
+        audio_url = (
+            meta.get("download")
+            or meta.get("downloadUrl")
+            or meta.get("download_url")
+            or meta.get("url")
+            or meta.get("audio")
+            or meta.get("link")
+        )
         if audio_url:
             try:
                 fpath, mtype = download_remote_file(audio_url, preferred_ext="mp3", preferred_type="audio")
                 items.append(UniversalMediaItem(media_type=mtype, file_path=fpath, caption=caption))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to download Spotify audio: %s", e)
 
     # 8. TeraBox
     elif platform == "terabox":

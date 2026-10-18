@@ -35,6 +35,7 @@ from bot.services.downloader import (
 from bot.services.audio import (
     extract_audio,
     extract_full_audio,
+    download_audio_by_query,
     cleanup_file as cleanup_audio,
 )
 from bot.services.acrcloud import recognize_audio
@@ -114,55 +115,28 @@ async def handle_video_link(message: Message):
     await log_download(message.from_user.id, platform, success=True)
     bot_username = await _get_bot_username(message.bot)
 
-    # Prepare audio extraction & music recognition if there is a video
+    # Fast audio extraction for the "Download song" button without delaying video delivery
     first_video = next((it for it in items if it.media_type == "video"), None)
     audio_token = None
 
-    if first_video:
-        sample_path = None
-        song_title = None
-        song_artist = None
-
-        # 1. Recognize music with ACRCloud
-        try:
-            sample_path = extract_audio(first_video.file_path, duration_seconds=20)
-            rec_result = recognize_audio(sample_path)
-            if rec_result:
-                song_title = rec_result.title
-                song_artist = rec_result.artist
-                await log_recognition(message.from_user.id, success=True)
-            else:
-                await log_recognition(message.from_user.id, success=False)
-        except Exception as e:
-            logger.debug("Music recognition error: %s", e)
-        finally:
-            if sample_path:
-                cleanup_audio(sample_path)
-
-        if not song_title:
-            if first_video.caption and first_video.caption.strip():
-                song_title = first_video.caption.strip().split("\n")[0][:60]
-            else:
-                song_title = "Audio track"
-            song_artist = f"@{bot_username}"
-
-        # 2. Extract full MP3 audio track
+    if first_video and os.path.exists(first_video.file_path):
         try:
             full_audio_path = extract_full_audio(
                 first_video.file_path,
-                title=song_title,
-                artist=song_artist,
+                title="Audio track",
+                artist=f"@{bot_username}",
             )
             audio_token = uuid.uuid4().hex[:12]
             audio_cache.store(
                 token=audio_token,
                 audio_path=full_audio_path,
-                title=song_title,
-                artist=song_artist,
+                title="Audio track",
+                artist=f"@{bot_username}",
                 bot_username=bot_username,
+                video_caption=first_video.caption or "",
             )
         except Exception as e:
-            logger.warning("Could not extract full audio: %s", e)
+            logger.warning("Could not extract audio track for cache: %s", e)
             audio_token = None
 
     keyboard = audio_download_keyboard(audio_token, lang=lang) if audio_token else None
@@ -235,33 +209,106 @@ async def handle_get_audio(callback: CallbackQuery):
         await callback.answer(t("audio_expired", lang), show_alert=True)
         return
 
-    await callback.answer(t("audio_sending", lang))
-
-    bot_username = item.bot_username or "bot"
-    audio_caption = t("credit", lang, bot_username=bot_username)
-
-    try:
-        if item.file_id:
+    # If already recognized and cached on Telegram cloud
+    if item.file_id:
+        await callback.answer(t("audio_sending", lang))
+        bot_username = item.bot_username or "bot"
+        caption = t("credit", lang, bot_username=bot_username)
+        try:
             await callback.message.reply_audio(
                 audio=item.file_id,
-                caption=audio_caption,
+                caption=caption,
                 title=item.title,
                 performer=item.artist,
             )
-        elif item.audio_path and os.path.exists(item.audio_path):
+            return
+        except Exception:
+            pass
+
+    if not item.audio_path or not os.path.exists(item.audio_path):
+        await callback.answer(t("audio_file_missing", lang), show_alert=True)
+        return
+
+    await callback.answer(t("audio_searching", lang))
+    status_msg = await callback.message.reply(t("audio_searching", lang))
+
+    bot_username = item.bot_username or "bot"
+    song_title = None
+    song_artist = None
+
+    # Step 1: Search & Recognize music with ACRCloud
+    sample_path = None
+    try:
+        sample_path = extract_audio(item.audio_path, duration_seconds=20)
+        rec_result = recognize_audio(sample_path)
+        if rec_result:
+            song_title = rec_result.title
+            song_artist = rec_result.artist
+            await log_recognition(callback.from_user.id, success=True)
+        else:
+            await log_recognition(callback.from_user.id, success=False)
+    except Exception as e:
+        logger.debug("Music recognition error: %s", e)
+    finally:
+        if sample_path:
+            cleanup_audio(sample_path)
+
+    # Step 2: If recognized, search full studio track; otherwise send extracted audio
+    try:
+        if song_title and song_artist:
+            try:
+                await status_msg.edit_text(t("audio_found", lang, artist=song_artist, title=song_title))
+            except Exception:
+                pass
+
+            # Search full studio track via yt-dlp search
+            full_track_path = download_audio_by_query(f"{song_artist} - {song_title}")
+            audio_caption = t("audio_caption_found", lang, artist=song_artist, title=song_title, bot_username=bot_username)
+
+            if full_track_path and os.path.exists(full_track_path):
+                sent = await callback.message.reply_audio(
+                    audio=FSInputFile(full_track_path),
+                    caption=audio_caption,
+                    title=song_title,
+                    performer=song_artist,
+                )
+                if sent.audio:
+                    item.file_id = sent.audio.file_id
+                cleanup_file(full_track_path)
+            else:
+                sent = await callback.message.reply_audio(
+                    audio=FSInputFile(item.audio_path),
+                    caption=audio_caption,
+                    title=song_title,
+                    performer=song_artist,
+                )
+                if sent.audio:
+                    item.file_id = sent.audio.file_id
+        else:
+            # Fallback to extracted audio track
+            clean_title = "Audio track"
+            if item.video_caption and item.video_caption.strip():
+                clean_title = item.video_caption.strip().split("\n")[0][:50]
+            performer = f"@{bot_username}"
+            audio_caption = t("credit", lang, bot_username=bot_username)
+
             sent = await callback.message.reply_audio(
                 audio=FSInputFile(item.audio_path),
                 caption=audio_caption,
-                title=item.title,
-                performer=item.artist,
+                title=clean_title,
+                performer=performer,
             )
             if sent.audio:
                 item.file_id = sent.audio.file_id
-                # Remove file from local disk to save space now that Telegram cloud cached it
-                cleanup_file(item.audio_path)
-                item.audio_path = None
-        else:
-            await callback.answer(t("audio_file_missing", lang), show_alert=True)
+
+        try:
+            await status_msg.delete()
+        except Exception:
+            pass
+
     except Exception as e:
         logger.exception("Failed to send audio for token %s: %s", token, e)
-        await callback.answer(t("audio_send_error", lang), show_alert=True)
+        try:
+            await status_msg.edit_text(t("audio_send_error", lang))
+        except Exception:
+            await callback.answer(t("audio_send_error", lang), show_alert=True)
