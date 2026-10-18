@@ -2,10 +2,22 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 
 async function threadsDownloader(postUrl) {
+  if (!postUrl) throw new Error("Missing Threads post URL");
+
+  // Normalize threads.com -> threads.net
+  let cleanUrl = postUrl.replace(/threads\.com/i, "threads.net");
+  // Clean tracking query parameters (e.g. ?xmt=..., ?slof=...)
+  try {
+    const parsed = new URL(cleanUrl);
+    cleanUrl = `${parsed.origin}${parsed.pathname}`;
+  } catch (e) {
+    // Ignore and proceed with cleanUrl
+  }
+
   const endpoint = "https://lovethreads.net/api/ajaxSearch";
 
   const form = new URLSearchParams({
-    q: postUrl,
+    q: cleanUrl,
     t: "media",
     lang: "en",
   });

@@ -19,6 +19,7 @@ from bot.database.requests import (
     log_download,
     log_recognition,
     touch_user,
+    get_user_language,
 )
 from bot.services.subscription import get_unsubscribed_channels
 from bot.keyboards.subscription_kb import subscription_keyboard
@@ -38,6 +39,7 @@ from bot.services.audio import (
 )
 from bot.services.acrcloud import recognize_audio
 from bot.services.audio_cache import audio_cache
+from bot.services.i18n import t
 
 router = Router()
 
@@ -56,8 +58,8 @@ async def _get_bot_username(bot) -> str:
     return _bot_username
 
 
-def _format_caption(original_caption: str | None, bot_username: str) -> str:
-    credit = f"🎬 @{bot_username} orqali yuklab olindi"
+def _format_caption(original_caption: str | None, bot_username: str, lang: str = "uz") -> str:
+    credit = t("credit", lang, bot_username=bot_username)
     if original_caption and original_caption.strip():
         text = original_caption.strip()
         max_len = 1024 - len(credit) - 4
@@ -69,8 +71,10 @@ def _format_caption(original_caption: str | None, bot_username: str) -> str:
 
 @router.message(F.text.regexp(URL_PATTERN))
 async def handle_video_link(message: Message):
+    lang = await get_user_language(message.from_user.id) or "uz"
+
     if await is_user_blocked(message.from_user.id):
-        await message.answer("🚫 You have been blocked from using this bot.")
+        await message.answer(t("user_blocked", lang))
         return
 
     await touch_user(message.from_user.id)
@@ -78,8 +82,8 @@ async def handle_video_link(message: Message):
     unsubscribed = await get_unsubscribed_channels(message.bot, message.from_user.id)
     if unsubscribed:
         await message.answer(
-            "🔒 Please subscribe to the required channel(s) first.",
-            reply_markup=subscription_keyboard(unsubscribed),
+            t("subscribe_text", lang),
+            reply_markup=subscription_keyboard(unsubscribed, lang=lang),
         )
         return
 
@@ -87,7 +91,7 @@ async def handle_video_link(message: Message):
     url = match.group(0)
     platform = detect_platform(url)
 
-    status_message = await message.answer("⏳ Downloading your media, please wait...")
+    status_message = await message.answer(t("downloading", lang))
 
     items: list[MediaItem] = []
     try:
@@ -96,17 +100,14 @@ async def handle_video_link(message: Message):
         logger.error("DownloadError for url %s: %s", url, e)
         await log_download(message.from_user.id, platform, success=False)
         await status_message.edit_text(
-            f"😔 Sorry, I couldn't download this media.\n\n"
-            f"<b>Details:</b> <code>{str(e)[:200]}</code>\n\n"
-            "The link might be private, unsupported, or temporarily unavailable."
+            t("download_error", lang, error=str(e)[:200])
         )
         return
     except Exception as e:
         logger.exception("Unexpected error downloading %s: %s", url, e)
         await log_download(message.from_user.id, platform, success=False)
         await status_message.edit_text(
-            f"😔 An error occurred while downloading this media.\n\n"
-            f"<b>Details:</b> <code>{str(e)[:200]}</code>"
+            t("unexpected_error", lang, error=str(e)[:200])
         )
         return
 
@@ -164,15 +165,15 @@ async def handle_video_link(message: Message):
             logger.warning("Could not extract full audio: %s", e)
             audio_token = None
 
-    keyboard = audio_download_keyboard(audio_token) if audio_token else None
+    keyboard = audio_download_keyboard(audio_token, lang=lang) if audio_token else None
 
     try:
-        await status_message.edit_text("📤 Sending your media...")
+        await status_message.edit_text(t("sending", lang))
 
         # Case 1: Single item
         if len(items) == 1:
             item = items[0]
-            caption = _format_caption(item.caption, bot_username)
+            caption = _format_caption(item.caption, bot_username, lang=lang)
             if item.media_type == "video":
                 await message.answer_video(
                     FSInputFile(item.file_path),
@@ -197,7 +198,7 @@ async def handle_video_link(message: Message):
                 media_group = []
                 for idx, it in enumerate(chunk):
                     file_input = FSInputFile(it.file_path)
-                    caption = _format_caption(it.caption, bot_username) if (i == 0 and idx == 0) else None
+                    caption = _format_caption(it.caption, bot_username, lang=lang) if (i == 0 and idx == 0) else None
                     if it.media_type == "video":
                         media_group.append(InputMediaVideo(media=file_input, caption=caption))
                     else:
@@ -206,7 +207,7 @@ async def handle_video_link(message: Message):
 
             if keyboard:
                 await message.answer(
-                    f"🎬 @{bot_username} orqali yuklab olindi",
+                    t("credit", lang, bot_username=bot_username),
                     reply_markup=keyboard,
                 )
 
@@ -218,9 +219,7 @@ async def handle_video_link(message: Message):
 
     except Exception as e:
         logger.exception("Failed to send media: %s", e)
-        await status_message.edit_text(
-            "😔 The media was downloaded but could not be sent (file may be too large or format unsupported)."
-        )
+        await status_message.edit_text(t("send_error", lang))
     finally:
         # Clean up temporary downloaded video / images
         cleanup_media(items)
@@ -228,17 +227,18 @@ async def handle_video_link(message: Message):
 
 @router.callback_query(F.data.startswith("get_audio:"))
 async def handle_get_audio(callback: CallbackQuery):
+    lang = await get_user_language(callback.from_user.id) or "uz"
     token = callback.data.split(":", 1)[1]
     item = audio_cache.get(token)
 
     if not item:
-        await callback.answer("⚠️ Qo'shiq topilmadi yoki muddati o'tgan.", show_alert=True)
+        await callback.answer(t("audio_expired", lang), show_alert=True)
         return
 
-    await callback.answer("📥 Qo'shiq yuborilmoqda...")
+    await callback.answer(t("audio_sending", lang))
 
     bot_username = item.bot_username or "bot"
-    audio_caption = f"🎬 @{bot_username} orqali yuklab olindi"
+    audio_caption = t("credit", lang, bot_username=bot_username)
 
     try:
         if item.file_id:
@@ -261,7 +261,7 @@ async def handle_get_audio(callback: CallbackQuery):
                 cleanup_file(item.audio_path)
                 item.audio_path = None
         else:
-            await callback.answer("⚠️ Qo'shiq fayli mavjud emas.", show_alert=True)
+            await callback.answer(t("audio_file_missing", lang), show_alert=True)
     except Exception as e:
         logger.exception("Failed to send audio for token %s: %s", token, e)
-        await callback.answer("😔 Qo'shiqni yuborishda xatolik yuz berdi.", show_alert=True)
+        await callback.answer(t("audio_send_error", lang), show_alert=True)

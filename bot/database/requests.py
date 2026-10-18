@@ -39,6 +39,22 @@ async def get_user(telegram_id: int):
     return await cursor.fetchone()
 
 
+async def get_user_language(telegram_id: int) -> str | None:
+    user = await get_user(telegram_id)
+    if user and user["language"]:
+        return user["language"]
+    return None
+
+
+async def set_user_language(telegram_id: int, language: str) -> None:
+    db = await get_connection()
+    await db.execute(
+        "UPDATE users SET language = ?, last_active = datetime('now') WHERE telegram_id = ?",
+        (language, telegram_id),
+    )
+    await db.commit()
+
+
 async def is_user_blocked(telegram_id: int) -> bool:
     user = await get_user(telegram_id)
     return bool(user["is_blocked"]) if user else False

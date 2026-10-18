@@ -60,31 +60,31 @@ def detect_platform(url: str) -> str:
     url = url.lower()
     if "tiktok.com" in url:
         return "TikTok"
-    if "douyin.com" in url:
+    if "douyin.com" in url or "iesdouyin.com" in url:
         return "Douyin"
-    if "kuaishou.com" in url:
+    if "kuaishou.com" in url or "kwai.com" in url or "kwai" in url:
         return "Kuaishou"
     if "instagram.com" in url:
         return "Instagram"
     if "pinterest.com" in url or "pin.it" in url:
         return "Pinterest"
-    if "threads.net" in url:
+    if "threads.net" in url or "threads.com" in url:
         return "Threads"
-    if "spotify.com" in url or "open.spotify" in url:
+    if "spotify.com" in url or "open.spotify" in url or "spotify.link" in url:
         return "Spotify"
     if "snapchat.com" in url:
         return "Snapchat"
     if "capcut.com" in url:
         return "CapCut"
-    if any(x in url for x in ("terabox", "1024tera", "terafileshare")):
+    if any(x in url for x in ("terabox", "1024tera", "terafileshare", "teraboxapp", "mirrobox", "nephobox")):
         return "TeraBox"
-    if "soundcloud.com" in url:
+    if "soundcloud.com" in url or "on.soundcloud.com" in url:
         return "SoundCloud"
-    if "bsky.app" in url:
+    if "bsky.app" in url or "bluesky" in url:
         return "Bluesky"
-    if "reddit.com" in url:
+    if "reddit.com" in url or "redd.it" in url:
         return "Reddit"
-    if "dailymotion.com" in url:
+    if "dailymotion.com" in url or "dai.ly" in url:
         return "Dailymotion"
     if "tumblr.com" in url:
         return "Tumblr"
@@ -92,7 +92,7 @@ def detect_platform(url: str) -> str:
         return "LinkedIn"
     if "youtube.com" in url or "youtu.be" in url:
         return "YouTube"
-    if "facebook.com" in url or "fb.watch" in url:
+    if "facebook.com" in url or "fb.watch" in url or "fb.com" in url:
         return "Facebook"
     if "twitter.com" in url or "x.com" in url:
         return "Twitter (X)"
@@ -100,8 +100,16 @@ def detect_platform(url: str) -> str:
 
 
 def normalize_url(url: str) -> str:
-    """Resolve shortened URLs like pin.it."""
+    """Resolve shortened URLs and normalize domains."""
     clean_url = url.strip()
+    # Threads normalization
+    if "threads.com" in clean_url.lower():
+        clean_url = clean_url.replace("threads.com", "threads.net")
+    # Instagram normalization
+    if "instagram.com" in clean_url.lower():
+        clean_url = re.sub(r"https?://(?:[a-zA-Z0-9_-]+\.)?instagram\.com", "https://www.instagram.com", clean_url, flags=re.IGNORECASE)
+        clean_url = re.sub(r"/reels/", "/reel/", clean_url, flags=re.IGNORECASE)
+    # Pinterest shortlink resolution
     if "pin.it" in clean_url.lower():
         try:
             resp = requests.head(clean_url, allow_redirects=True, timeout=10)
@@ -380,7 +388,7 @@ def download_media(url: str) -> list[MediaItem]:
     url = normalize_url(url)
     platform = detect_platform(url)
 
-    # 1. Dedicated platforms handled directly by universalDownloader
+    # 1. Dedicated platforms handled primarily by universalDownloader
     universal_first = {
         "Threads",
         "Spotify",
@@ -391,6 +399,10 @@ def download_media(url: str) -> list[MediaItem]:
         "Kuaishou",
         "Bluesky",
         "SoundCloud",
+        "Reddit",
+        "Dailymotion",
+        "Tumblr",
+        "LinkedIn",
     }
     if platform in universal_first:
         try:
@@ -405,16 +417,39 @@ def download_media(url: str) -> list[MediaItem]:
         except Exception:
             pass
 
-    # 2. Pinterest (high-res API + fallback)
+    # 2. Twitter / X (try universalDownloader first, then yt-dlp)
+    if platform == "Twitter (X)":
+        try:
+            resp = call_universal_downloader(url, "twitter")
+            if resp:
+                u_items = parse_and_download_universal(resp)
+                if u_items:
+                    return [
+                        MediaItem(media_type=it.media_type, file_path=it.file_path, caption=it.caption)
+                        for it in u_items
+                    ]
+        except Exception:
+            pass
+
+    # 3. Pinterest (high-res API + universalDownloader + fallback)
     if platform == "Pinterest":
         try:
             return _download_pinterest(url)
         except Exception:
-            pass
+            try:
+                resp = call_universal_downloader(url, "pinterest")
+                if resp:
+                    u_items = parse_and_download_universal(resp)
+                    if u_items:
+                        return [
+                            MediaItem(media_type=it.media_type, file_path=it.file_path, caption=it.caption)
+                            for it in u_items
+                        ]
+            except Exception:
+                pass
 
-    # 3. Instagram - Primary: universalDownloader, Fallback: yt-dlp
-    if platform == "Instagram":
-        # First choice: universalDownloader (Snapsave)
+    # 4. Instagram & Facebook - Primary: universalDownloader, Fallback: yt-dlp
+    if platform in ("Instagram", "Facebook"):
         try:
             resp = call_universal_downloader(url, "meta")
             if resp:
@@ -427,17 +462,50 @@ def download_media(url: str) -> list[MediaItem]:
         except Exception:
             pass
 
-        # Fallback choice: yt-dlp patched extractor
-        try:
-            return _download_instagram(url)
-        except Exception:
-            pass
+        if platform == "Instagram":
+            try:
+                return _download_instagram(url)
+            except Exception:
+                pass
 
-    # 4. Generic download using yt-dlp
+    # 5. TikTok & YouTube - Primary: yt-dlp, Fallback: universalDownloader
+    if platform == "TikTok":
+        try:
+            return _download_generic(url)
+        except Exception:
+            try:
+                resp = call_universal_downloader(url, "tiktok")
+                if resp:
+                    u_items = parse_and_download_universal(resp)
+                    if u_items:
+                        return [
+                            MediaItem(media_type=it.media_type, file_path=it.file_path, caption=it.caption)
+                            for it in u_items
+                        ]
+            except Exception:
+                pass
+
+    if platform == "YouTube":
+        try:
+            return _download_generic(url)
+        except Exception:
+            try:
+                resp = call_universal_downloader(url, "youtube")
+                if resp:
+                    u_items = parse_and_download_universal(resp)
+                    if u_items:
+                        return [
+                            MediaItem(media_type=it.media_type, file_path=it.file_path, caption=it.caption)
+                            for it in u_items
+                        ]
+            except Exception:
+                pass
+
+    # 6. Generic download using yt-dlp
     try:
         return _download_generic(url)
     except Exception as e:
-        # Final fallback: try universalDownloader engine
+        # Final fallback: try universalDownloader engine for anything yt-dlp couldn't handle
         try:
             resp = call_universal_downloader(url)
             if resp:

@@ -24,23 +24,23 @@ const { fetchYouTubeData } = require("./services/youtubeService");
 
 function detectPlatform(url) {
   const lower = url.toLowerCase();
-  if (lower.includes("threads.net")) return "threads";
-  if (lower.includes("spotify.com") || lower.includes("open.spotify")) return "spotify";
+  if (lower.includes("threads.net") || lower.includes("threads.com")) return "threads";
+  if (lower.includes("spotify.com") || lower.includes("open.spotify") || lower.includes("spotify.link")) return "spotify";
   if (lower.includes("snapchat.com")) return "snapchat";
   if (lower.includes("capcut.com")) return "capcut";
-  if (lower.includes("terabox") || lower.includes("1024tera") || lower.includes("terafileshare")) return "terabox";
-  if (lower.includes("douyin.com")) return "douyin";
-  if (lower.includes("kuaishou.com")) return "kuaishou";
+  if (lower.includes("terabox") || lower.includes("1024tera") || lower.includes("terafileshare") || lower.includes("teraboxapp") || lower.includes("mirrobox") || lower.includes("nephobox")) return "terabox";
+  if (lower.includes("douyin.com") || lower.includes("iesdouyin.com")) return "douyin";
+  if (lower.includes("kuaishou.com") || lower.includes("kwai.com") || lower.includes("kwai-video.com")) return "kuaishou";
   if (lower.includes("bsky.app") || lower.includes("bluesky")) return "bluesky";
-  if (lower.includes("soundcloud.com")) return "soundcloud";
-  if (lower.includes("reddit.com")) return "reddit";
-  if (lower.includes("dailymotion.com")) return "dailymotion";
+  if (lower.includes("soundcloud.com") || lower.includes("on.soundcloud.com")) return "soundcloud";
+  if (lower.includes("reddit.com") || lower.includes("redd.it")) return "reddit";
+  if (lower.includes("dailymotion.com") || lower.includes("dai.ly")) return "dailymotion";
   if (lower.includes("tumblr.com")) return "tumblr";
   if (lower.includes("linkedin.com")) return "linkedin";
   if (lower.includes("pinterest.com") || lower.includes("pin.it")) return "pinterest";
-  if (lower.includes("tiktok.com")) return "tiktok";
+  if (lower.includes("tiktok.com") || lower.includes("douyin")) return "tiktok";
   if (lower.includes("twitter.com") || lower.includes("x.com")) return "twitter";
-  if (lower.includes("instagram.com") || lower.includes("facebook.com") || lower.includes("fb.watch")) return "meta";
+  if (lower.includes("instagram.com") || lower.includes("facebook.com") || lower.includes("fb.watch") || lower.includes("fb.com")) return "meta";
   if (lower.includes("youtube.com") || lower.includes("youtu.be")) return "youtube";
   return "unknown";
 }

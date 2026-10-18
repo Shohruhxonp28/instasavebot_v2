@@ -43,14 +43,15 @@ MAX_VIDEO_SIZE_MB: int = int(os.getenv("MAX_VIDEO_SIZE_MB", "50"))
 FFMPEG_PATH: str = os.getenv("FFMPEG_PATH", "")
 
 SUPPORTED_PLATFORMS = [
-    "Instagram (Reels, Posts, Carousel)",
-    "Pinterest",
-    "TikTok & Douyin",
+    "Instagram (Reels, Posts, Carousel, Stories)",
     "Threads",
-    "Spotify & SoundCloud",
-    "Snapchat & CapCut",
-    "YouTube",
+    "TikTok & Douyin",
+    "Pinterest (Images & Videos)",
+    "YouTube (Shorts & Videos)",
     "Facebook",
     "Twitter (X)",
+    "Spotify & SoundCloud",
+    "Snapchat & CapCut",
     "TeraBox & Reddit",
+    "Kuaishou, Bluesky, Dailymotion, Tumblr, LinkedIn",
 ]

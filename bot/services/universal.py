@@ -292,7 +292,7 @@ def parse_and_download_universal(resp_data: dict) -> list[UniversalMediaItem]:
             except Exception:
                 pass
 
-    # 9. TikTok (SSSTik fallback)
+    # 9. TikTok
     elif platform == "tiktok":
         title = data.get("title") or ""
         downloads = data.get("downloads", [])
@@ -306,17 +306,142 @@ def parse_and_download_universal(resp_data: dict) -> list[UniversalMediaItem]:
                 except Exception:
                     pass
 
-    # 10. Generic fallback: check common URL fields
+    # 10. Twitter / X
+    elif platform in ("twitter", "x"):
+        title = data.get("title") or ""
+        videos = data.get("videos", [])
+        images = data.get("images", [])
+        if videos:
+            v_url = videos[0].get("url")
+            if v_url:
+                try:
+                    fpath, mtype = download_remote_file(v_url, preferred_ext="mp4", preferred_type="video")
+                    items.append(UniversalMediaItem(media_type=mtype, file_path=fpath, caption=title))
+                except Exception:
+                    pass
+        for img in images:
+            img_url = img.get("url") if isinstance(img, dict) else img
+            if img_url:
+                try:
+                    fpath, mtype = download_remote_file(img_url, preferred_ext="jpg", preferred_type="photo")
+                    items.append(UniversalMediaItem(media_type=mtype, file_path=fpath, caption=title))
+                except Exception:
+                    pass
+
+    # 11. Reddit
+    elif platform == "reddit":
+        r_url = data if isinstance(data, str) else (data.get("downloadUrl") or data.get("url"))
+        if r_url and isinstance(r_url, str) and r_url.startswith("http"):
+            try:
+                fpath, mtype = download_remote_file(r_url, preferred_ext="mp4", preferred_type="video")
+                items.append(UniversalMediaItem(media_type=mtype, file_path=fpath))
+            except Exception:
+                pass
+
+    # 12. YouTube
+    elif platform == "youtube":
+        title = data.get("title") or ""
+        videos = data.get("videos", [])
+        audios = data.get("audios", [])
+        best_v = None
+        for v in videos:
+            if v.get("url"):
+                best_v = v
+                break
+        if best_v:
+            try:
+                fpath, mtype = download_remote_file(best_v["url"], preferred_ext="mp4", preferred_type="video")
+                items.append(UniversalMediaItem(media_type=mtype, file_path=fpath, caption=title))
+            except Exception:
+                pass
+        elif audios:
+            a_url = audios[0].get("url")
+            if a_url:
+                try:
+                    fpath, mtype = download_remote_file(a_url, preferred_ext="mp3", preferred_type="audio")
+                    items.append(UniversalMediaItem(media_type=mtype, file_path=fpath, caption=title))
+                except Exception:
+                    pass
+
+    # 13. Pinterest
+    elif platform == "pinterest":
+        title = data.get("title") or ""
+        downloads = data.get("downloads", [])
+        if downloads:
+            best_dl = downloads[0]
+            d_url = best_dl.get("url")
+            if d_url:
+                pref_ext = "mp4" if "mp4" in best_dl.get("format", "").lower() else "jpg"
+                pref_type = "video" if pref_ext == "mp4" else "photo"
+                try:
+                    fpath, mtype = download_remote_file(d_url, preferred_ext=pref_ext, preferred_type=pref_type)
+                    items.append(UniversalMediaItem(media_type=mtype, file_path=fpath, caption=title))
+                except Exception:
+                    pass
+
+    # 14. SoundCloud
+    elif platform == "soundcloud":
+        title = data.get("title") or "SoundCloud Track"
+        medias = data.get("medias", [])
+        s_url = None
+        if medias:
+            s_url = medias[0].get("url")
+        if not s_url:
+            s_url = data.get("url") or data.get("download_url")
+        if s_url:
+            try:
+                fpath, mtype = download_remote_file(s_url, preferred_ext="mp3", preferred_type="audio")
+                items.append(UniversalMediaItem(media_type=mtype, file_path=fpath, caption=title))
+            except Exception:
+                pass
+
+    # 15. Kuaishou, Dailymotion, Tumblr, LinkedIn
+    elif platform in ("kuaishou", "dailymotion", "tumblr", "linkedin"):
+        cand_url = None
+        title = data.get("title") or "" if isinstance(data, dict) else ""
+        if isinstance(data, dict):
+            cand_url = (
+                data.get("url")
+                or data.get("downloadUrl")
+                or data.get("download_url")
+                or data.get("videoUrl")
+                or data.get("video_url")
+                or data.get("media_url")
+            )
+            if not cand_url and isinstance(data.get("data"), dict):
+                sub = data["data"]
+                cand_url = sub.get("url") or sub.get("download_url") or sub.get("video_url")
+        elif isinstance(data, str) and data.startswith("http"):
+            cand_url = data
+
+        if cand_url:
+            try:
+                fpath, mtype = download_remote_file(cand_url)
+                items.append(UniversalMediaItem(media_type=mtype, file_path=fpath, caption=title))
+            except Exception:
+                pass
+
+    # 16. Generic fallback: check common URL fields or string data
     if not items:
         url_candidates = []
-        if isinstance(data, dict):
-            for k in ("url", "download_url", "video_url", "media_url", "direct_url", "video"):
+        if isinstance(data, str) and data.startswith("http"):
+            url_candidates.append(data)
+        elif isinstance(data, dict):
+            for k in ("url", "download_url", "downloadUrl", "video_url", "videoUrl", "media_url", "direct_url", "video"):
                 if data.get(k) and isinstance(data[k], str) and data[k].startswith("http"):
                     url_candidates.append(data[k])
             if "downloads" in data and isinstance(data["downloads"], list):
                 for d in data["downloads"]:
                     if isinstance(d, dict) and d.get("url"):
                         url_candidates.append(d["url"])
+            if "videos" in data and isinstance(data["videos"], list):
+                for v in data["videos"]:
+                    if isinstance(v, dict) and v.get("url"):
+                        url_candidates.append(v["url"])
+            if "links" in data and isinstance(data["links"], list):
+                for link in data["links"]:
+                    if isinstance(link, dict) and link.get("url"):
+                        url_candidates.append(link["url"])
 
         for cand in url_candidates:
             try:
