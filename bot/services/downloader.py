@@ -331,8 +331,10 @@ def _download_video_with_ytdlp(url: str) -> str:
         ydl_opts["username"] = INSTAGRAM_USERNAME
         ydl_opts["password"] = INSTAGRAM_PASSWORD
 
-    if FFMPEG_PATH:
-        ydl_opts["ffmpeg_location"] = FFMPEG_PATH
+    from bot.services.audio import get_ffmpeg_bin
+    ffmpeg_bin = get_ffmpeg_bin()
+    if ffmpeg_bin and ffmpeg_bin != "ffmpeg":
+        ydl_opts["ffmpeg_location"] = ffmpeg_bin
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:

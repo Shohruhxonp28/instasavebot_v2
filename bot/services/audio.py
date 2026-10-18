@@ -6,13 +6,37 @@ import uuid
 import subprocess
 from bot.config import MEDIA_DIR, FFMPEG_PATH
 
+import shutil
+
 try:
     import static_ffmpeg
     static_ffmpeg.add_paths()
 except Exception:
     pass
 
-FFMPEG_BIN = FFMPEG_PATH if FFMPEG_PATH else "ffmpeg"
+
+def get_ffmpeg_bin() -> str:
+    """Return a working path to ffmpeg executable, validating existence."""
+    if FFMPEG_PATH and os.path.exists(FFMPEG_PATH):
+        return FFMPEG_PATH
+
+    cand = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
+    if cand:
+        return cand
+
+    try:
+        import static_ffmpeg
+        static_ffmpeg.add_paths()
+        cand = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
+        if cand:
+            return cand
+    except Exception:
+        pass
+
+    return "ffmpeg"
+
+
+FFMPEG_BIN = get_ffmpeg_bin()
 
 
 
